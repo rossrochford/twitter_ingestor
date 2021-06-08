@@ -3,7 +3,7 @@ Twitter API Ingestor
 
 twitter_ingestor is a tool for ingesting data from Twitter's API at scale using a pool of API keys.
 
-Each api-key/endpoint combination is fronted by a priority queue and managed by its own rate-limited worker, this means data requests can be queued up to keep the API keys maximally utilized while also responding quickly to data requested in response to user behaviour.
+Each api-key/endpoint combination is fronted by a priority queue and managed by its own rate-limited worker. Data requests can be queued up, keeping the API keys maximally utilized while also responding quickly to any data requested in response to user behaviour.
 
 Currently it scrapes the following endpoints:
 * https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/follow-search-get-users/api-reference/get-users-lookup
