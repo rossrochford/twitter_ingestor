@@ -1,0 +1,13 @@
+{% extends 'base/base.html' %}
+
+{% load crispy_forms_tags %}
+
+{% block 'content' %}
+<div>
+    <h3>{{ num_profiles }} profiles selected</h3>
+</div>
+<br/>
+
+{% crispy form form.helper %}
+
+{% endblock %}

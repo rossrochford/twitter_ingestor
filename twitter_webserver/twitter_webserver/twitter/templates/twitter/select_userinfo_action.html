@@ -1,0 +1,22 @@
+{% extends 'base/base.html' %}
+
+{% load crispy_forms_tags %}
+
+{% block 'content' %}
+<div>
+    <p>tags "{{ tags_joined }}" selected</p>
+    <ul>
+        <li>
+            <b>{{ num_without_user_info }} profiles</b> without user_info found
+        </li>
+        <li>
+            <b>{{ num_with_user_info }} profiles</b> with user_info found
+        </li>
+    </ul>
+</div>
+
+<p></p>
+
+{% crispy form form.helper %}
+
+{% endblock %}

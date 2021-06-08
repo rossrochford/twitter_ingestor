@@ -1,0 +1,263 @@
+@import 'bootstrap/scss/bootstrap';
+
+// Abstract elements like functions, variables and mixins
+//@import 'styles/abstract/index';
+// Generic styles
+//@import 'styles/generic/bootstrap';
+//@import 'styles/generic/space';
+
+html{
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  > .send-to-bottom {
+    margin-top: auto;
+  }
+}
+
+img {
+  // Make sure images don't span wider than
+  // their containter by default
+  max-width: 100%;
+  height: auto;
+}
+
+svg {
+  fill: currentColor;
+  height: auto;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+:last-child {
+  margin-bottom: 0;
+}
+
+.appearance-none {
+  appearance:none;
+}
+
+.rotate-90 {
+  transform: rotate(90deg);
+}
+
+// Set a minimum size to the navigation links
+.navbar .nav-link {
+  line-height: (40rem / 16);
+  display: inline-block;
+
+  &.nav-link {
+    color: $light;
+  }
+}
+
+.rounded-inside-card {
+  border-radius: calc(#{$card-border-radius} - #{$card-border-width});
+}
+
+// Make the spacing on the side of containers a bit more generous
+// Enough to allow the width of the icons
+.container{
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+.link-darker {
+  color: $link-hover-color;
+}
+
+.copy {
+  font-size: 1rem;
+}
+
+.container--small {
+  max-width: (600rem / 16);
+}
+
+.container--medium {
+  max-width: (1000rem / 16);
+}
+
+.btn-icon-only {
+  > svg,
+  > img {
+    display: block;
+    width: 1em;
+  }
+
+  padding: map-get($spacers, 2) / 1rem * 1em;
+}
+
+.align-icon {
+  position: relative;
+  bottom: (2em/16);
+}
+
+.text-with-icon>svg {
+  position: relative;
+  bottom: (2em/16);
+}
+
+.with-decorative-button {
+  &:hover {
+    .with-decorative-button__button {
+      @each $color-name, $color-value in $theme-colors {
+        &.btn-outline-#{$color-name} {
+          background-color: $color-value;
+          color: color-yiq($color-value);
+        }
+      }
+    }
+  }
+}
+
+.card-footer {
+
+  [class*="btn-outline"] {
+    background-color: white;
+  }
+
+  @each $color-name,$color-value in $theme-colors {
+    .btn-outline-#{$color-name} {
+      &:hover {
+        color: $color-value;
+        text-decoration: underline;
+      }
+    }
+  }
+}
+
+.action-list,
+.card {
+  position: relative;
+  z-index: 0;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0.25rem;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: -1;
+    box-shadow: 0px 10px 0px 5px rgba(0, 0, 0, 0.075);
+    border-radius: $list-group-border-radius;
+  }
+
+  // .list-group-item {
+  //   border-left-width: 0;
+  //   border-right-width: 0;
+  // }
+
+  // .list-group-item:first-child {
+  //   border-top-width:0;
+  // }
+
+  // .list-group-item:last-child {
+  //   border-bottom-width: 0;
+  // }
+}
+
+.action-header {
+  position: relative;
+
+  text-align: center;
+
+  .action-header__id {
+    position:absolute;
+    bottom: 100%;
+    left: 50%;
+    transform:translateX(-50%);
+    margin: 0;
+  }
+}
+
+.action-list-item{
+  position: relative;
+  padding-left: 2.5rem;
+  padding-right: 3rem; // A little more to make the icon centered
+
+
+  // Extend the stretched link to encompass the elements
+  // popping out on the sides
+  .stretched-link::after {
+    left: -1.25rem;
+    right: -1.25rem;
+  }
+}
+
+.action-list-item-link {
+  &,&:hover, &:active {
+    color: inherit;
+    font: inherit;
+  }
+}
+
+.action-list-item__icon {
+  // Inherit everything from parent
+  // so the values are set to enable offsetting it
+  // but vary when state changes
+  background-color: inherit;
+  border: solid 1px $list-group-border-color;
+  color: inherit;
+  // Remove transition to make the background
+  // change at the same time as the rest of it
+  transition: none;
+}
+
+.action-list-item__type {
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translate(50%, -50%);
+  border-radius: 100%;
+
+  font-size: 1.25rem;
+  padding: 0.75em;
+}
+
+.action-list-item__action {
+  position: absolute;
+  right: map-get($spacers, 3);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.site-footer {
+  padding-top: map-get($spacers,1);
+  padding-bottom: map-get($spacers,1);
+  padding-left: map-get($spacers, 3);
+  padding-right: map-get($spacers, 3);
+  text-align: center;
+  color: $text-muted;
+
+  ul {
+    list-style-type: none;
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 0;
+    // The negative margin compensates for the
+    // margin of the items themselves
+    margin: map-get($spacers, 1) * -1;
+
+    > * {
+      margin: map-get($spacers, 1)
+    }
+  }
+
+  a {
+    color: inherit;
+    text-decoration: underline;
+
+    &:hover {
+      text-decoration: none;
+    }
+  }
+}

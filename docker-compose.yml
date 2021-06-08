@@ -1,0 +1,78 @@
+version: '3'
+
+services:
+  postgresql-master:
+    image: 'bitnami/postgresql:13.3.0-debian-10-r22'
+    ports:
+      - '5432'
+    volumes:
+      - './postgres/postgres-data:/bitnami/postgresql'
+      #- './postgres/conf/:/opt/bitnami/postgresql/conf/'  <-- can't get this working
+    environment:
+      - POSTGRESQL_USERNAME=my_user
+      - POSTGRESQL_PASSWORD=my_password
+      - POSTGRESQL_DATABASE=twitter_db
+    hostname: postgresql-master
+    networks:
+      - twitter-scraper-network
+
+  redis-server:
+    image: "redis:6.2.4"
+    command: ["redis-server", "/usr/local/etc/redis.conf"]
+    hostname: redis-server
+    ports:
+      - "16379:6379"
+    networks:
+      - twitter-scraper-network
+    volumes:
+      - "./redis/redis.conf:/usr/local/etc/redis.conf"
+      # todo: what about persisting data in a volume?
+
+  twitter-scraper:
+    build: ./twitter_pqueue_scraper
+    command: [ "sleep", "infinity" ]
+    environment:
+      - REDIS_HOSTNAME=redis-server
+      - POSTGRESQL_USERNAME=my_user
+      - POSTGRESQL_PASSWORD=my_password
+      - POSTGRESQL_HOSTNAME=postgresql-master
+      - POSTGRESQL_DATABASE=twitter_db
+      - DJANGO_SERVER_HOSTNAME=twitter-webserver
+      - DJANGO_SERVER_PORT=8000
+    hostname: twitter-scraper
+    networks:
+      - twitter-scraper-network
+    volumes:
+    - "./twitter_pqueue_scraper:/app/twitter_pqueue_scraper/"
+    depends_on:
+      - redis-server
+
+  twitter-webserver:
+    build: ./twitter_webserver
+    # command: [ "sleep", "infinity" ]
+    environment:
+      - RUN_ENV=dev
+      - REDIS_HOSTNAME=redis-server
+      - POSTGRESQL_USERNAME=my_user
+      - POSTGRESQL_PASSWORD=my_password
+      - POSTGRESQL_HOSTNAME=postgresql-master
+      - POSTGRESQL_DATABASE=twitter_db
+    hostname: twitter-webserver
+    networks:
+      - twitter-scraper-network
+    ports:
+      - "8000:8000"
+    volumes:
+    - "./twitter_webserver/twitter_webserver:/app/twitter_webserver/"
+    depends_on:
+      - redis-server
+      - postgresql-master
+
+networks:
+  twitter-scraper-network:
+    driver: bridge
+    name: twitter-scraper-network
+
+# todo: create network externally with this config so services can access the host machine (for selenium service)
+# https://forums.docker.com/t/accessing-host-machine-from-within-docker-container/14248/5
+

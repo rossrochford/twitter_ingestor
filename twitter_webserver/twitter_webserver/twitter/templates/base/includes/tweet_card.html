@@ -1,0 +1,39 @@
+  <li class="tweet-card">
+    <div class="tweet-content">
+      <div class="tweet-header">
+        <span class="fullname">
+          <strong>{{  tweet.author.display_name }}</strong>
+        </span>
+        <span class="username">{{  tweet.author.screen_name_or_userid }}</span>
+        <span class="tweet-time">- {{  tweet.published_datetime_display }}</span>
+      </div>
+
+      <a>
+        {% if tweet.author.profile_image_url %}
+        <img class="tweet-card-avatar" src="{{ tweet.author.profile_image_url }}" alt="">
+        {% else %}
+        <img class="tweet-card-avatar" src="https://pbs.twimg.com/profile_images/1268408824802627584/4i6I2nfR_bigger.jpg" alt="">
+        {% endif %}
+      </a>
+      <div class="tweet-text">
+        <p class="" lang="en" data-aria-label-part="0">
+        {{ tweet.text }}
+        </p>
+        <!--
+        <p class="" lang="es" data-aria-label-part="0">¡Nuevo artículo en Mozilla!<br>Poo: Corregido – Una breve historia sobre un error reportado por la comunidad <a href="https://t.co/dqg5hVQXA0" class="twitter-timeline-link" target="_blank"><span class="">https://www.mozilla-hispano.org/</span></a>                  <a href="" class="twitter-hashtag"><s>#</s><b>firefox</b></a> <a href="" class="twitter-hashtag"><s>#</s><b>comunidad</b></a>
+          <a href="" class="twitter-hashtag" dir="ltr"></a>
+        </p>-->
+      </div>
+      <div class="tweet-footer">
+        <a class="tweet-footer-btn">
+          <i class="octicon octicon-comment" aria-hidden="true"></i><span>?</span>
+        </a>
+        <a class="tweet-footer-btn">
+          <i class="octicon octicon-sync" aria-hidden="true"></i><span> {{ tweet.retweet_count }}</span>
+        </a>
+        <a class="tweet-footer-btn">
+          <i class="octicon octicon-heart" aria-hidden="true"></i><span> {{ tweet.favorite_count }}</span>
+        </a>
+      </div>
+    </div>
+  </li>

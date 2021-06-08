@@ -1,0 +1,17 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>TwitterScraper - {% block page_title %}{{ page_title }}{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'styles.css' %}">
+  </head>
+  <body>
+    {% include 'base/includes/messages.html' %}
+    <main class="container container--small py-5 space-4">
+      {% block 'content' %}
+      {% endblock %}
+    </main>
+  </body>
+</html>

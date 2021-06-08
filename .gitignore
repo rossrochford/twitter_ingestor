@@ -1,0 +1,17 @@
+.idea/
+__pycache__/
+venv/
+.build/
+*.egg-info/
+*.tar.gz
+*.zip
+config/api-keys.json
+config/tag-categories.json
+config/twitter-accounts.xls
+twitter_webserver/initial_twitter_accounts.xls
+twitter_webserver/twitter_webserver/frontend/.cache
+twitter_webserver/twitter_webserver/frontend/node_modules/*
+twitter_webserver/twitter_webserver/frontend/static-built/*
+postgres/postgres-data
+
+

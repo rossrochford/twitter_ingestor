@@ -1,0 +1,7 @@
+{
+    "twitter": {
+        "my-account-1": {
+            "bearer_token": "--YOUR_API_BEARER_TOKEN--"
+        }
+    }
+}

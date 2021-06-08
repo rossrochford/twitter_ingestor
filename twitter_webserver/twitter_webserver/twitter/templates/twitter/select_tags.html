@@ -1,0 +1,17 @@
+{% extends 'base/base.html' %}
+
+{% load crispy_forms_tags %}
+
+{% block 'content' %}
+<h2> Select tags </h2>
+
+{% if total_tags_count == 0 %}
+<p>No tags have been added to the system</p>
+{% else %}
+{% crispy form form.helper %}
+<hr/>
+
+<a href="{% url 'flush-group' work_type='user_info' %}">flush user-info</a>
+{% endif %}
+
+{% endblock %}
