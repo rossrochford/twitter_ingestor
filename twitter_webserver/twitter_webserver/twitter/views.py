@@ -34,7 +34,7 @@ from .models import (
     LikeRel
 )
 from twitter.util.ingestion import ingest_spreadsheet
-from twitter.util.redis_util import send_scrape_work
+from twitter.util.redis_util import send_scrape_work, send_scrape_work__conversation
 
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ WORK_TYPES = [
     'user_info',
     'tweet_likes',
     'tweet_retweets',
-    # 'conversation',
+    'conversation_tweets'
 ]
 
 PROFILE_RELATED_MODELS = [
@@ -123,13 +123,17 @@ class SendOneView(FormView):
 
     def form_valid(self, form):
         work_type = form.cleaned_data['work_type']
-        profiles = form.cleaned_data['selected_profiles']
 
-        # profiles = [TwitterProfile.objects.get(pk=8885)]
-        items_sent = send_scrape_work(
-            None, profiles, work_type, priority=1, flush=True
-        )
-
+        if work_type == 'conversation_tweets':
+            conversation_ids = form.cleaned_data['conversation_ids']
+            items_sent = send_scrape_work__conversation(
+                None, conversation_ids, priority=1, flush=True
+            )
+        else:
+            profiles = form.cleaned_data['selected_profiles']
+            items_sent = send_scrape_work(
+                None, profiles, work_type, priority=1, flush=True
+            )
         messages.success(self.request, f"{work_type} requested, sent: {items_sent} items")
         return super().form_valid(form)
 
@@ -307,18 +311,18 @@ class SelectScrapeTasksView(FormView):
 
         workload_keys = ['user_timeline', 'user_likes', 'friend_ids', 'follower_ids']
 
+        priority = int(form_data['priority'])
+        limit = int(form_data['limit'])
+
         for wt in workload_keys:
             do_scrape = form_data[f'scrape_{wt}']
             if not do_scrape:
                 continue
-            priority = int(form_data[f'{wt}_priority'] or 2)
 
             _profiles = profiles
-            if form_data[f'{wt}_limit']:
-                limit = int(form_data[f'{wt}_limit'])
-                _profiles = profiles[:limit]
-                if not _profiles:
-                    continue   # limit was set to < 1
+            _profiles = profiles[:limit]
+            if not _profiles:
+                continue   # limit was set to < 1
 
             flush = form_data.get('flush_queues', False)
             send_scrape_work(

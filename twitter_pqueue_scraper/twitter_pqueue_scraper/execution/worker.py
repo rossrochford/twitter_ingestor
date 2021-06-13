@@ -43,7 +43,7 @@ class TwitterWorker(BatchWorker):
 
         if item_dict.get('flush_group') or item_dict.get('exit'):
             succ, item_obj = ControlItem.create_from_dict(item_dict)
-        elif item_dict['work_type'] == 'conversation':
+        elif item_dict['work_type'] == 'conversation_tweets':
             succ, item_obj = TwitterConversationWorkItem.create_from_dict(item_dict)
         else:
             succ, item_obj = TwitterProfileWorkItem.create_from_dict(item_dict)

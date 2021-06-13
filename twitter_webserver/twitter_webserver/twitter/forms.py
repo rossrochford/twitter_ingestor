@@ -19,7 +19,8 @@ WORK_TYPE_CHOICES = [
     'user_timeline',
     'user_likes',
     'friend_ids',
-    'follower_ids'
+    'follower_ids',
+    'conversation_tweets',
 ]
 WORK_TYPE_CHOICES = [(s, s) for s in WORK_TYPE_CHOICES]
 
@@ -33,27 +34,40 @@ SPREADSHEET_MIME_TYPES = (
 
 class SendOneForm(forms.Form):
 
+    id_strings = forms.CharField()
+    work_type = forms.ChoiceField(
+        label='work type',
+        widget=forms.Select, choices=WORK_TYPE_CHOICES
+    )
+
     def __init__(self, *args, **kwargs):
         # self.user = kwargs.pop('user')
         super().__init__(*args, **kwargs)
 
         self.helper = FormHelper()
         self.helper.layout = Layout(
-            Fieldset('', 'screen_names_or_userids', 'work_type'),
+            Fieldset('', 'id_strings', 'work_type'),
             ButtonHolder(
                 Submit('submit', 'Next')
             )
         )
 
-    screen_names_or_userids = forms.CharField()
-    work_type = forms.ChoiceField(
-        label='work type',
-        widget=forms.Select, choices=WORK_TYPE_CHOICES
-    )
-
     def clean(self):
+
+        work_type = self.cleaned_data['work_type']
+
+        if work_type == 'conversation_tweets':
+            ids = self.cleaned_data['id_strings'].split(',')
+            ids = [i.strip() for i in ids]
+            for id in ids:
+                if not id.isdigit():
+                    raise forms.ValidationError(f"{id} is not a numeric conversation id")
+
+            self.cleaned_data['conversation_ids'] = ids
+            return self.cleaned_data
+
         screen_names, user_ids = [], []
-        for id in self.cleaned_data['screen_names_or_userids'].split(','):
+        for id in self.cleaned_data['id_strings'].split(','):
             id = id.strip().lower()
             if not id:
                 continue
@@ -61,8 +75,6 @@ class SendOneForm(forms.Form):
                 user_ids.append(id)
             else:
                 screen_names.append(id)
-
-        work_type = self.cleaned_data['work_type']
 
         profiles_by_sn, profiles_by_userid = {}, {}
         if screen_names:
@@ -299,22 +311,8 @@ class SelectScrapeTasksFormOLD(forms.Form):
     scrape_friend_ids = forms.BooleanField(label='scrape', required=False)
     scrape_follower_ids = forms.BooleanField(label='scrape', required=False)
 
-    user_timeline_priority = forms.ChoiceField(
+    limit = forms.IntegerField(label='limit', required=False)
+    priority = forms.ChoiceField(
         choices=PRIORITY_CHOICES, initial=2, label='priority', required=False
     )
-    user_likes_priority = forms.ChoiceField(
-        choices=PRIORITY_CHOICES, initial=2, label='priority', required=False
-    )
-    friend_ids_priority = forms.ChoiceField(
-        choices=PRIORITY_CHOICES, initial=2, label='priority', required=False
-    )
-    follower_ids_priority = forms.ChoiceField(
-        choices=PRIORITY_CHOICES, initial=2, label='priority', required=False
-    )
-
-    user_likes_limit = forms.IntegerField(label='limit', required=False)
-    user_timeline_limit = forms.IntegerField(label='limit', required=False)
-    friend_ids_limit = forms.IntegerField(label='limit', required=False)
-    follower_ids_limit = forms.IntegerField(label='limit', required=False)
-
     flush_queues = forms.BooleanField(initial=True, required=False)

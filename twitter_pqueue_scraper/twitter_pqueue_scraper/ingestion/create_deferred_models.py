@@ -9,9 +9,9 @@ from twitter_pqueue_scraper.batch_tasks.util import parse_date_str
 
 
 # for tips on how to preprocess tweet text for NLP, see page 4 here: https://arxiv.org/pdf/1708.03994.pdf
-def remove_links_and_mentions(timeline_tweet):
+def remove_links_and_mentions(tweet_di):
 
-    text = timeline_tweet['text'].strip()
+    text = tweet_di['text'].strip()
     if text.startswith('RT @'):
         if text.rstrip() == 'RT @':
             return ''
@@ -26,7 +26,8 @@ def remove_links_and_mentions(timeline_tweet):
 
     # what about hashtags?
 
-    urls = timeline_tweet['entities']['urls']
+    urls = tweet_di.get('entities', {}).get('urls') or []
+    # urls = tweet_di['entities']['urls']
 
     text_no_links = text
     for url_di in urls:
@@ -42,8 +43,31 @@ def remove_links_and_mentions(timeline_tweet):
     return text_no_links
 
 
+def get_status_type(tweet_di):
+
+    text = tweet_di['text']
+    urls = tweet_di.get('entities', {}).get('urls') or []
+
+    if len(urls) == 1 and urls[0]['url'] == text:
+        return 'link-only-status'
+
+    for media_di in tweet_di.get('entities', {}).get('media', []):
+        if media_di['url'] == text:
+            return 'media-object-status'  # media_di['type']
+
+    if not urls:
+        return 'text-only-status'
+
+    text_without_links = remove_links_and_mentions(tweet_di)
+
+    if not text_without_links:
+        return 'link-only-status'  # note: could be more than one link here
+    return 'text-with-link'
+
+
 def get_tweet_scenario(timeline_tweet):
     text = timeline_tweet['text'].strip()
+
     if timeline_tweet['is_quote_status']:
         return 'retweet-with-quote'
     if timeline_tweet.get('retweeted_status'):
@@ -53,34 +77,19 @@ def get_tweet_scenario(timeline_tweet):
         # begins with an @ mention, even though it's not a reply on a thread.
         return 'reply'
 
-    urls = timeline_tweet['entities']['urls']
-    if len(urls) == 1 and urls[0]['url'] == text:
-        return 'link-only-status'
-
-    for media_di in timeline_tweet['entities'].get('media', []):
-        if media_di['url'] == text:
-            return 'media-object'  # media_di['type']
-
-    if not urls:
-        return 'text-only-status'
-
-    text_without_links = remove_links_and_mentions(timeline_tweet)
-
-    if not text_without_links:
-        return 'link-only-status'  # note: could be more than one link here
-    return 'text-with-link'
+    return get_status_type(timeline_tweet)
 
 
 def _create_deferred_replyto_tweet(tweet_di):
     return DeferredTweet(
         tweet_di['in_reply_to_status_id_str'], None, None, None,
-        None, None, tweet_di['in_reply_to_user_id_str'], None, None
+        None, None, None, tweet_di['in_reply_to_user_id_str'], None, None
     )
 
 
 def _create_deferred_blank_quoted_tweet(id_str):
     return DeferredTweet(
-        id_str, None, None, None, None, None, None, None, None
+        id_str, None, None, None, None, None, None, None, None, None
     )
 
 
@@ -93,24 +102,22 @@ def _create_deferred_tweet(tweet_di, scrape_source):
     else:
         tweet_type = 'status'
 
-    has_link = bool(tweet_di['entities']['urls'])
+    has_link = bool(tweet_di.get('entities', {}).get('urls'))
     has_text = bool(remove_links_and_mentions(tweet_di))
 
     def_tweet = DeferredTweet(
         tweet_di['id_str'], json.dumps(tweet_di), scrape_source,
-        tweet_type, has_link, has_text, tweet_di['user']['id_str'], None,
-        parse_date_str(tweet_di['created_at'])
+        tweet_type, has_link, has_text, None, tweet_di['user']['id_str'],
+        None, parse_date_str(tweet_di['created_at'])
     )
     return def_tweet
 
 
-def _create_deferred_mentions(Base, tweet_di):
-    TwitterProfile = Base.classes.twitter_twitterprofile
-    ProfileMentionedInTweet = Base.classes.twitter_profilementionedintweet
+def _create_deferred_mentions(tweet_di):
 
     profiles, mention_rels = [], []
 
-    for profile_di in tweet_di['entities']['user_mentions']:
+    for profile_di in tweet_di.get('entities', {}).get('user_mentions', []):
         profiles.append(
             DeferredTwitterProfile(profile_di['id_str'], None, None)
         )
@@ -122,14 +129,12 @@ def _create_deferred_mentions(Base, tweet_di):
     return profiles, mention_rels
 
 
-def create_deferred_models(worker, user_id, tweet_di, scenario=None):
-
-    db_session, Base = worker.db_connection
+def create_deferred_models(user_id, tweet_di, scenario=None):
 
     if scenario is None:
         scenario = get_tweet_scenario(tweet_di)
 
-    def_profiles, def_mention_rels = _create_deferred_mentions(Base, tweet_di)
+    def_profiles, def_mention_rels = _create_deferred_mentions(tweet_di)
 
     if scenario == 'user-like':
         def_tweet = _create_deferred_tweet(tweet_di, 'user-like')
@@ -137,8 +142,7 @@ def create_deferred_models(worker, user_id, tweet_di, scenario=None):
             def_tweet.tweet_api_id, None, user_id, None,
             tweet_di['id_str'], parse_date_str(tweet_di['created_at'])
         )
-        rels = [def_like_rel] + def_mention_rels
-        return def_profiles, [def_tweet], rels
+        return def_profiles + [def_tweet, def_like_rel] + def_mention_rels
 
     if scenario == 'retweet':
         def_tweet = _create_deferred_tweet(
@@ -149,8 +153,7 @@ def create_deferred_models(worker, user_id, tweet_di, scenario=None):
             tweet_di['is_quote_status'], tweet_di['id_str'],
             parse_date_str(tweet_di['created_at'])
         )
-        rels = [def_retweet_rel] + def_mention_rels
-        return def_profiles, [def_tweet], rels
+        return def_profiles + [def_tweet, def_retweet_rel] + def_mention_rels
 
     if scenario == 'retweet-with-quote':
 
@@ -165,8 +168,7 @@ def create_deferred_models(worker, user_id, tweet_di, scenario=None):
                 tweet_di['is_quote_status'], tweet_di['id_str'],
                 parse_date_str(tweet_di['created_at'])
             )
-            rels = [def_retweet_rel] + def_mention_rels
-            return def_profiles, [def_outer_tweet, def_inner_tweet], rels
+            return def_profiles + [def_outer_tweet, def_inner_tweet, def_retweet_rel] + def_mention_rels
 
         if 'quoted_status_id_str' in tweet_di:
             # occurs when quoted status is "unavailable" and I've also found it to
@@ -182,13 +184,12 @@ def create_deferred_models(worker, user_id, tweet_di, scenario=None):
                 tweet_di['is_quote_status'], tweet_di['id_str'],
                 parse_date_str(tweet_di['created_at'])
             )
-            rels = [def_retweet_rel] + def_mention_rels
-            return def_profiles, [def_outer_tweet, def_inner_tweet], rels
+            return def_profiles + [def_outer_tweet, def_inner_tweet, def_retweet_rel] + def_mention_rels
+
         else:
             # when quoted tweet is unavailable, I'm not sure why quoted_status_id_str exists only sometimes?
             def_outer_tweet = _create_deferred_tweet(tweet_di, 'user-timeline')
-            rels = def_mention_rels  # no additional rels
-            return def_profiles, [def_outer_tweet], rels
+            return def_profiles + [def_outer_tweet] + def_mention_rels
 
     if scenario == 'reply':
 
@@ -201,10 +202,9 @@ def create_deferred_models(worker, user_id, tweet_di, scenario=None):
             tweet_di['in_reply_to_status_id_str'], None,
             tweet_di['id_str'], None, parse_date_str(tweet_di['created_at'])
         )
-        rels = def_mention_rels + [def_reply_rel]
-        return def_profiles, [def_replyto_tweet, def_reply_tweet], rels
+        return def_profiles + [def_replyto_tweet, def_reply_tweet, def_reply_rel] + def_mention_rels
+
     else:
         # standalone status
         def_tweet = _create_deferred_tweet(tweet_di, 'user-timeline')
-        rels = def_mention_rels  # no additonal rels
-        return def_profiles, [def_tweet], rels
+        return def_profiles + [def_tweet] + def_mention_rels

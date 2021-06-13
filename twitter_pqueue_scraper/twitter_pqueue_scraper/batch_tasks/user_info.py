@@ -150,6 +150,7 @@ async def _resolve_potential_duplicates(worker, profile_index, potential_duplica
     if not potential_duplicates:
         return
 
+    to_merge = []
     obj_ids = [tup[0].id for tup in potential_duplicates]
     user_ids = [tup[2]['id_str'] for tup in potential_duplicates]
 
@@ -202,7 +203,7 @@ async def _create_missing(worker, profile_index, to_create):
             profile = TwitterProfile(**kwargs)
 
         _set_profile_fields(profile, ui_dict, status_code)
-        print(f"created new profile: {profile.user_id} {profile.screen_name}")
+
         new_profiles.append(profile)
 
     if new_profiles:

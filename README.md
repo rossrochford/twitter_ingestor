@@ -50,7 +50,7 @@ Here are the webserver URLS:
     * http://localhost:8000/import-tag-categories
 * Select a collection of profiles by tag and submit them to be scraped
     * http://localhost:8000/select-tags
-* Submit a single profile to be scraped using the screen_name or user_id
+* Submit profiles or conversations/threads to be scraped, submit a screen_name, user_id or conversation_id
     * http://localhost:8000/send-one
 * View a user's ingested tweets:
     * http://localhost:8000/feed/<screen_name_or_userid>

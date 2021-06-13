@@ -1,19 +1,38 @@
+import base64
 import copy
-
-import httpx
-import trio
-
-from trio_util.http_util import TrioHttpSession
-
 from functools import partial
+import json
+import urllib
 
 from eliot import log_call, start_action
 import httpx
 import rauth
 import trio
 
+from trio_util.http_util import TrioHttpSession
+
 
 RETRY_LIMIT = 10
+
+
+CONVERSATION_EXPANSIONS = [
+    'author_id', 'referenced_tweets.id', 'referenced_tweets.id.author_id', 'entities.mentions.username', 'attachments.poll_ids', 'attachments.media_keys', 'in_reply_to_user_id', 'geo.place_id'
+]
+CONVERSATION_EXPANSIONS_joined = ','.join(CONVERSATION_EXPANSIONS)
+
+TWEET_FIELDS = ['attachments', 'author_id', 'context_annotations', 'conversation_id', 'created_at', 'entities', 'geo', 'id', 'in_reply_to_user_id', 'lang', 'public_metrics', 'possibly_sensitive', 'referenced_tweets', 'reply_settings', 'source', 'text', 'withheld']   # non_public_metrics, 'organic_metrics', 'promoted_metrics'
+TWEET_FIELDS_joined = ','.join(TWEET_FIELDS)
+
+PLACE_FIELDS = ['contained_within', 'country', 'country_code', 'full_name', 'geo', 'name', 'place_type']
+PLACE_FIELDS_joined = ','.join(PLACE_FIELDS)
+
+USER_FIELDS = ['created_at', 'description', 'entities', 'id', 'location', 'name', 'pinned_tweet_id', 'profile_image_url', 'protected', 'public_metrics', 'url', 'username', 'verified', 'withheld']
+USER_FIELDS_joined = ','.join(USER_FIELDS)
+
+
+def _urlencode(string):
+    # for some reason it wont accept strings without an argument!
+    return urllib.parse.urlencode({'a': string})[2:]
 
 
 class TwitterHttpSession(object):
@@ -22,6 +41,9 @@ class TwitterHttpSession(object):
         self.account_dict = account_dict
         self.http_session = http_session
         self.bearer_token = account_dict['bearer_token']
+        self.consumer_key = account_dict.get('consumer_key')
+        self.consumer_secret_key = account_dict.get('consumer_secret_key')
+        self.app_bearer_token = None
 
     @staticmethod
     def create_from_account_dict(account_dict):
@@ -130,10 +152,46 @@ class TwitterHttpSession(object):
         status_code, resp_obj = await self.do_request('post', url)
         return status_code, resp_obj
 
-    async def v2__get_conversation_tweets(self, conversation_id):
-        url = f"https://api.twitter.com/2/tweets/search/recent?query=conversation_id:{conversation_id}&tweet.fields=in_reply_to_user_id,author_id,text,id,public_metrics,lang&expansions=author_id,in_reply_to_user_id,referenced_tweets.id,entities.mentions.username"
+    async def get_app_bearer_token(self):
 
-        return await self.do_request('get', url)
+        if self.app_bearer_token:
+            return self.app_bearer_token
+        if self.consumer_key is None or self.consumer_secret_key is None:
+            return None
+
+        consumer_key = _urlencode(self.consumer_key)
+        consumer_secret_key = _urlencode(self.consumer_secret_key)
+        bearer_token = f"{consumer_key}:{consumer_secret_key}"
+        bearer_token_encoded = base64.b64encode(bearer_token.encode())
+
+        url = 'https://api.twitter.com/oauth2/token'
+        headers = {
+            "Authorization": b"Basic " + bearer_token_encoded,
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+        }
+        status_code, resp_obj = await self.do_request(
+            'post', url, headers=headers, data=b"grant_type=client_credentials"
+        )
+        if status_code != 200:
+            return None
+
+        self.app_bearer_token = resp_obj.json()['access_token']
+        return self.app_bearer_token
+
+    async def v2__get_conversation_tweets(self, conversation_id, cursor=None):
+
+        url = f"https://api.twitter.com/2/tweets/search/recent?query=conversation_id:{conversation_id}&max_results=100&tweet.fields={TWEET_FIELDS_joined}&expansions={CONVERSATION_EXPANSIONS_joined}&place.fields={PLACE_FIELDS_joined}&user.fields={USER_FIELDS_joined}"
+
+        #url = f"https://api.twitter.com/2/tweets/search/recent?query=conversation_id:{conversation_id}&max_results=100&tweet.fields=in_reply_to_user_id,author_id,text,id,public_metrics,lang&expansions=author_id,in_reply_to_user_id,referenced_tweets.id,entities.mentions.username,created_at,conversation_id"
+
+        if cursor:
+            url = url + f"&next_token={cursor}"
+
+        # https://api.twitter.com/2/tweets/search/recent?query=conversation_id:1279940000004973111&tweet.fields=in_reply_to_user_id,author_id,created_at,conversation_id
+        token = await self.get_app_bearer_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        return await self.do_request('get', url, headers=headers)
 
     async def v2__get_tweets(self, tweet_ids):
 

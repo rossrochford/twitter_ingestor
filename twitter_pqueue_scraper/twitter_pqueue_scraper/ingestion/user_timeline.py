@@ -4,16 +4,13 @@ from twitter_pqueue_scraper.ingestion.ingest_deferred_models import ingest_defer
 
 async def ingest_user_timeline(worker, user_id, user_timeline_data):
 
-    def_profiles, def_tweets, def_rels = [], [], []
+    def_objects = []
     for tweet_di in user_timeline_data:
-        _profiles, _tweets, _rels = create_deferred_models(
-            worker, user_id, tweet_di, scenario=None
+        do = create_deferred_models(
+            user_id, tweet_di, scenario=None
         )
-        def_profiles.extend(_profiles)
-        def_tweets.extend(_tweets)
-        def_rels.extend(_rels)
+        def_objects.extend(do)
 
     await ingest_deferred_models(
-        worker, def_profiles, def_tweets, def_rels, True,
-        parent_author_userid=user_id
+        worker, def_objects, parent_author_userid=user_id
     )

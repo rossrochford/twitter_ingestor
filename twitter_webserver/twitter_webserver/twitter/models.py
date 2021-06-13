@@ -15,7 +15,8 @@ WORK_TYPE_CHOICES = [
     'user_timeline',
     'user_likes',
     'friend_ids',
-    'follower_ids'
+    'follower_ids',
+    'conversion_tweets',
 ]
 WORK_TYPE_CHOICES = [(s, s) for s in WORK_TYPE_CHOICES]
 
@@ -78,7 +79,6 @@ ENDPOINT_QUOTAS = {
     ]
 }
 
-
 _ENDPOINT_CHOICES = []
 _API_SERVICE_CHOICES = []
 
@@ -120,6 +120,7 @@ class ApiQuotaPeriod(models.Model):
 
 
 class TagCategory(models.Model):
+
     slug = models.CharField(max_length=199, unique=True)
     tags = models.ManyToManyField('Tag', related_name='categories')
 
@@ -128,6 +129,7 @@ class TagCategory(models.Model):
 
 
 class Tag(models.Model):
+
     slug = models.CharField(max_length=199, unique=True)
 
     def __str__(self):
@@ -148,6 +150,7 @@ class Tag(models.Model):
 
 
 class TwitterProfileTagRel(models.Model):
+
     twitter_profile = models.ForeignKey('TwitterProfile', on_delete=models.CASCADE)
     tag = models.ForeignKey('Tag', on_delete=models.CASCADE)
 
@@ -166,36 +169,10 @@ class TwitterProfileTagRel(models.Model):
         merge_uniquetogether_rels(
             cls, 'twitter_profile_id', 'tag_id', profiles_to_merge
         )
-        '''
-        profile_ids = []
-        for id_to_keep, id_to_remove in profiles_to_merge:
-            profile_ids.append(ids_to_keep)
-            profile_ids.append(id_to_remove)
 
-        rel_objects_by_profile_id = defaultdict(list)
-        for obj in TwitterProfileTagRel.objects.filter(twitter_profile__in=profile_ids):
-            rel_objects_by_profile_id[obj.twitter_profile_id].append(obj)
-
-        with transaction.atomic():
-            # atomic() defers save calls so they will be aggregated after this block
-            for profile_to_keep, profile_to_remove in profiles_to_merge:
-                if profile_to_remove not in rel_objects_by_profile_id:
-                    continue  # no rels to transfer found
-
-                # change twitter_profile_ids but ensure unique_together constraint isn't violated
-                rels_to_transfer = rel_objects_by_profile_id[profile_to_remove]
-                existing_rels = rel_objects_by_profile_id[profile_to_keep]
-                existing_tag_ids =  [r.tag_id for r in existing_rels]
-
-                for rel_obj in rels_to_transfer:
-                    if rel_obj.tag_id in existing_tag_ids:
-                       rel_obj.delete()
-                       continue
-                    rel_obj.twitter_profile_id = profile_to_keep
-                    rel_obj.save()
-        '''
 
 class ProfileFollowsProfileRel(models.Model):
+
     source = models.ForeignKey(
         'TwitterProfile', on_delete=models.CASCADE,
         related_name='following_rels'
@@ -228,9 +205,9 @@ class ProfileFollowsProfileRel(models.Model):
 
 class TwitterProfile(models.Model):
 
-    screen_name = models.CharField(max_length=150, blank=True, null=True)
+    screen_name = models.CharField(max_length=60, blank=True, null=True)
     user_id = models.CharField(
-        max_length=150, blank=True, null=True, unique=True, primary_key=False
+        max_length=60, blank=True, null=True, unique=True, primary_key=False
     )
 
     is_available = models.BooleanField(blank=True, null=True)
@@ -241,24 +218,24 @@ class TwitterProfile(models.Model):
     user_info_prev_scrape_success = models.DateTimeField(blank=True, null=True)
     user_info_prev_status_code = models.IntegerField(blank=True, null=True)
 
-    user_timeline_since_id = models.CharField(max_length=99, blank=True, null=True)
+    user_timeline_since_id = models.CharField(max_length=60, blank=True, null=True)
     user_timeline_latest_tweet_datetime = models.DateTimeField(blank=True, null=True)
     user_timeline_prev_scrape_attempt = models.DateTimeField(blank=True, null=True)
     user_timeline_prev_scrape_success = models.DateTimeField(blank=True, null=True)
     user_timeline_prev_status_code = models.IntegerField(blank=True, null=True)
 
-    user_likes_since_id = models.CharField(max_length=99, blank=True, null=True)
+    user_likes_since_id = models.CharField(max_length=60, blank=True, null=True)
     user_likes_prev_scrape_attempt = models.DateTimeField(blank=True, null=True)
     user_likes_prev_scrape_success = models.DateTimeField(blank=True, null=True)
 
     follower_ids_fully_scraped = models.BooleanField(blank=True, null=True)
-    follower_ids_cursor = models.CharField(max_length=90, blank=True, null=True)
+    follower_ids_cursor = models.CharField(max_length=60, blank=True, null=True)
     follower_ids_prev_scrape_attempt = models.DateTimeField(blank=True, null=True)
     follower_ids_prev_scrape_success = models.DateTimeField(blank=True, null=True)
     follower_ids_prev_status_code = models.IntegerField(blank=True, null=True)
 
     friend_ids_fully_scraped = models.BooleanField(blank=True, null=True)
-    friend_ids_cursor = models.CharField(max_length=90, blank=True, null=True)
+    friend_ids_cursor = models.CharField(max_length=60, blank=True, null=True)
     friend_ids_prev_scrape_attempt = models.DateTimeField(blank=True, null=True)
     friend_ids_prev_scrape_success = models.DateTimeField(blank=True, null=True)
     friend_ids_prev_status_code = models.IntegerField(blank=True, null=True)
@@ -350,17 +327,6 @@ class TwitterProfile(models.Model):
                 return True
             return False
 
-        '''
-        if work_type == 'friend_ids2':
-            if self.friend_ids is None or self.friend_ids_fully_scraped is False:
-                return True
-            return False
-        if work_type == 'follower_ids2':
-            if self.follower_ids is None or self.follower_ids_fully_scraped is False:
-                return True
-            return False
-        '''
-
         print('warning: is_valid_for_workload() unknown scenario')
         return False
     '''
@@ -387,16 +353,15 @@ class TwitterProfile(models.Model):
             )
     '''
 
-
 class Tweet(models.Model):
 
-    tweet_api_id = models.CharField(max_length=150)
+    tweet_api_id = models.CharField(max_length=40)
     json_data = models.TextField(blank=True, null=True)
     scrape_source = models.CharField(  # describes where json_data was fetched from
-        max_length=90, blank=True, null=True, choices=TWEET_SOURCES
+        max_length=40, blank=True, null=True, choices=TWEET_SOURCES
     )
     tweet_type = models.CharField(  # nullable because reply-to tweets only have a tweet_api_id and an author
-        max_length=90, choices=TWEET_TYPES, blank=True, null=True
+        max_length=40, choices=TWEET_TYPES, blank=True, null=True
     )
     has_link = models.BooleanField(null=True, blank=True)
     has_text = models.BooleanField(null=True, blank=True)
@@ -404,6 +369,7 @@ class Tweet(models.Model):
     author = models.ForeignKey(  # probably will never be null in practice?
         TwitterProfile, on_delete=models.CASCADE, blank=True, null=True
     )
+    conversation_id = models.CharField(max_length=40, blank=True, null=True)
     publish_datetime = models.DateTimeField(blank=True, null=True)
 
     @classmethod
@@ -530,7 +496,7 @@ class RetweetRel(models.Model):
     # note: we're only storing a few fields here, not the full api json
     retweeted_by = models.ForeignKey('TwitterProfile', on_delete=models.CASCADE)
     is_quote = models.BooleanField()
-    retweet_api_id = models.CharField(max_length=90, blank=True, null=True)
+    retweet_api_id = models.CharField(max_length=40, blank=True, null=True)
     retweet_datetime = models.DateTimeField(blank=True, null=True)
 
     @classmethod
@@ -571,7 +537,7 @@ class LikeRel(models.Model):
 
     # note: we're only storing a few fields here, the json data will get stored on the Tweet itself
     liked_by = models.ForeignKey('TwitterProfile', on_delete=models.CASCADE)
-    like_api_id = models.CharField(max_length=90, blank=True, null=True)
+    like_api_id = models.CharField(max_length=40, blank=True, null=True)
     like_datetime = models.DateTimeField(blank=True, null=True)
 
     @classmethod
@@ -592,6 +558,3 @@ class LikeRel(models.Model):
                 for rel in rels_by_likedby_id[id_to_remove]:
                     rel.liked_by_id = id_to_keep
                     rel.save()
-
-
-# removed: Conversion

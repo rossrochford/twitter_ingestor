@@ -8,7 +8,7 @@ import trio
 from trio_util.http_util import TrioHttpSession
 
 from twitter_pqueue_scraper.batch_tasks.user_info import scrape_user_info
-from twitter_pqueue_scraper.batch_tasks.conversation import scrape_conversation_data
+from twitter_pqueue_scraper.batch_tasks.conversation_tweets import scrape_conversation_tweets
 from twitter_pqueue_scraper.batch_tasks.user_timeline import scrape_user_timeline
 from twitter_pqueue_scraper.batch_tasks.user_likes import scrape_user_likes
 from twitter_pqueue_scraper.batch_tasks.friend_ids import scrape_friend_ids
@@ -33,7 +33,7 @@ WORKER_TYPES = {
     'user_likes': BatchWorkerConfig(scrape_user_likes, 3, 1, 4, 1),
     'friend_ids': BatchWorkerConfig(scrape_friend_ids, 1, 0, 3, 1),
     'follower_ids': BatchWorkerConfig(scrape_follower_ids, 1, 0, 3, 1),
-    # 'conversation': BatchWorkerConfig(scrape_conversation_data, 20, 0, 40, 1),
+    'conversation_tweets': BatchWorkerConfig(scrape_conversation_tweets, 2, 0, 5, 1),
 }
 
 
@@ -108,7 +108,7 @@ async def _pop_and_move_item(worker_obj):
 
     q = worker_obj.priority_queue
     if q.queue_size > 3000:
-        # no point in proceeding, the worker's send_channel is most likely block
+        # no point in proceeding, the worker's send_channel is most likely blocked
         return False
 
     try:
@@ -117,11 +117,10 @@ async def _pop_and_move_item(worker_obj):
         return True
 
     try:
-        # print(f"sending item: {item.get('line_id')} to channel: {worker_obj.worker_name}")
-        await worker_obj.send_channel.send(item)
+        worker_obj.send_channel.send_nowait(item)
     except trio.WouldBlock:
         # put back on queue
-        q.put_nowait(priority, item)  # note: priority gets lost here!
+        q.put_nowait(priority, item)
         await trio.sleep(0.2)
 
     return False  # 'was_empty'

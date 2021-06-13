@@ -1,8 +1,8 @@
 from collections import defaultdict
 
 from twitter_pqueue_scraper.ingestion.deferred_models import (
-    DeferredTweet, DeferredReplyRel, DeferredRetweetRel, DeferredLikeRel,
-    DeferredProfileMentionedInTweet
+    DeferredTwitterProfile, DeferredTweet, DeferredReplyRel, DeferredRetweetRel,
+    DeferredLikeRel, DeferredProfileMentionedInTweet, dedup_def_objects
 )
 from twitter_pqueue_scraper.util.db_util import (
     get_or_create_by_key, get_or_create_by_multiple_keys
@@ -23,33 +23,6 @@ REL_FIELDS = {
     'tweet_mention': ('tweet_id', 'mentioned_profile_id'),
     'profile_mention': ('profile_id', 'mentioned_profile_id')
 }
-
-
-def _dedup_deftweets(def_tweets):
-
-    def _merge_tweets(def_tweet_list):
-        args = []
-        for field in DeferredTweet.get_fields():
-            value = None
-            for dt in def_tweet_list:
-                if getattr(dt, field) is not None:
-                    value = getattr(dt, field)
-                    break
-            args.append(value)
-        return DeferredTweet(*args)
-
-    def_tweets_by_id = defaultdict(list)
-    for dt in def_tweets:
-        def_tweets_by_id[dt.tweet_api_id].append(dt)
-
-    def_tweets_deduped = []
-    for id, _def_tweets in def_tweets_by_id.items():
-        if len(_def_tweets) > 1:
-            def_tweets_deduped.append(_merge_tweets(_def_tweets))
-            continue
-        def_tweets_deduped.append(_def_tweets[0])
-
-    return def_tweets_deduped
 
 
 async def get_or_create_tweets__from_def_tweets(
@@ -101,21 +74,20 @@ async def ingest_relationships__from_def_rels(
 
 
 async def ingest_deferred_models(
-    worker, def_profiles, def_tweets, def_rels,
-    dedup, parent_author_userid=None
+    worker, def_objects, parent_author_userid=None
 ):
-    # todo: handle def_profiles that have screen_name but no user_id
 
     db_session, Base = worker.db_connection
     TwitterProfile = Base.classes.twitter_twitterprofile
 
-    def_tweet_mention_rels = [dr for dr in def_rels if isinstance(dr, DeferredProfileMentionedInTweet)]
-    def_retweet_rels = [dr for dr in def_rels if isinstance(dr, DeferredRetweetRel)]
-    def_reply_rels = [dr for dr in def_rels if isinstance(dr, DeferredReplyRel)]
-    def_like_rels = [dr for dr in def_rels if isinstance(dr, DeferredLikeRel)]
+    def_objects = dedup_def_objects(def_objects)
 
-    if dedup:
-        def_tweets = _dedup_deftweets(def_tweets)
+    def_profiles = [do for do in def_objects if isinstance(do, DeferredTwitterProfile)]
+    def_tweets = [do for do in def_objects if isinstance(do, DeferredTweet)]
+    def_tweet_mention_rels = [dr for dr in def_objects if isinstance(dr, DeferredProfileMentionedInTweet)]
+    def_retweet_rels = [dr for dr in def_objects if isinstance(dr, DeferredRetweetRel)]
+    def_reply_rels = [dr for dr in def_objects if isinstance(dr, DeferredReplyRel)]
+    def_like_rels = [dr for dr in def_objects if isinstance(dr, DeferredLikeRel)]
 
     user_ids = [t.author_user_id for t in def_tweets if t.author_user_id]
     user_ids = user_ids + [p.profile_api_id for p in def_profiles]
@@ -132,19 +104,27 @@ async def ingest_deferred_models(
 
     if def_retweet_rels:
         await ingest_relationships__from_def_rels(
-            worker, def_retweet_rels, 'retweet', tweets_by_api_id, profiles_by_userid
+            worker, def_retweet_rels, 'retweet',
+            tweets_by_api_id, profiles_by_userid
         )
 
     if def_reply_rels:
         await ingest_relationships__from_def_rels(
-            worker, def_reply_rels, 'reply', tweets_by_api_id, profiles_by_userid
+            worker, def_reply_rels, 'reply', tweets_by_api_id,
+            profiles_by_userid
         )
 
     if def_like_rels:
         await ingest_relationships__from_def_rels(
-            worker, def_like_rels, 'like', tweets_by_api_id, profiles_by_userid
+            worker, def_like_rels, 'like', tweets_by_api_id,
+            profiles_by_userid
         )
 
     if def_tweet_mention_rels:
-        pass  # todo implement this twitter_pqueue_scraper.ingestion.mention_rels.py
+        await ingest_relationships__from_def_rels(
+            worker, def_like_rels, 'tweet_mention',
+            tweets_by_api_id, profiles_by_userid
+        )
 
+    # note: ProfileMentionedInProfileDescription are not ingested here, they are
+    # created directly in: batch_tasks.user_info._ingest_profile_description_mentions

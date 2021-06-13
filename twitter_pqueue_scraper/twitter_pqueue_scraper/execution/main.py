@@ -19,9 +19,14 @@ CONSUMER_GROUP = f"{REDIS_STREAM}-cg"
 CONSUMER_NAME = 'twitter-scraper-main'  # f"main-{uuid.uuid4().hex[:16]}"
 
 API_KEYS_FILEPATH = '/app/api-keys.json'
+NUM_ACCOUNTS_PER_ACTOR = 2  # adjusts the amount of async concurrency per actor-process
 
 
-def _get_profile_string(msg):
+def _get_routing_string(msg):
+
+    if msg['work_type'] == 'conversation_tweets':
+        return msg['conversation_id']
+
     # longer string seems to distribute items more fairly, so concatenate all ids
     st = str(msg.get('obj_id') or '')
     user_id = str(msg.get('user_id') or '')
@@ -33,13 +38,13 @@ def _get_profile_string(msg):
     return st.strip()
 
 
-def _choose_account_key(profile_string, account_keys):
+def _choose_account_key(routing_string, account_keys):
 
     num_workers = len(account_keys)
     if num_workers == 1:
         return account_keys[0]
 
-    h = hashlib.md5(profile_string.encode())
+    h = hashlib.md5(routing_string.encode())
     hsh = int(h.hexdigest(), 16)
     index = hsh % num_workers
 
@@ -79,12 +84,12 @@ async def daemon__forward_items(
                     to_submit[portal_name].append(msg_dict)
                 continue
 
-            profile_string = _get_profile_string(msg_dict)
-            if not profile_string:
-                print("warning: profile_string is blank, skipping item")
+            routing_string = _get_routing_string(msg_dict)
+            if not routing_string:
+                print("warning: routing_string is blank, skipping item")
                 await redis_stream.xack(line_id)
                 continue
-            account_key = _choose_account_key(profile_string, account_keys)
+            account_key = _choose_account_key(routing_string, account_keys)
             msg_dict['account_key'] = account_key  # key used to route to worker-task within actor-process
             portal_name = actor_names_by_accountkey[account_key]
             to_submit[portal_name].append(msg_dict)  # collect items into per-portal batches
@@ -128,7 +133,7 @@ async def _launch_actor(actor_name, actor_nursery, proc_api_keys):
 async def main():
 
     eliot_init_file(open(f"/tmp/eliot-main-actor.log", "w"))
-    NUM_KEYS_PER_PROC = 2
+
     API_KEYS = await get_api_keys()
     TWITTER_API_KEYS = API_KEYS['twitter']
 
@@ -143,9 +148,9 @@ async def main():
             _account_keys = [k for k in TWITTER_API_KEYS.keys()]
 
             while _account_keys:
-                # assign API keys for actors
+                # assign API keys to actor-processes
                 proc_api_keys = {}
-                for i in range(NUM_KEYS_PER_PROC):
+                for i in range(NUM_ACCOUNTS_PER_ACTOR):
                     if not _account_keys:
                         break
                     k = _account_keys.pop(0)

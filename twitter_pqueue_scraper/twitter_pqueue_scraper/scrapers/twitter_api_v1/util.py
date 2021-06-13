@@ -1,7 +1,5 @@
 
-from eliot import start_action
 import trio
-
 
 
 async def get_cursored(
@@ -16,9 +14,6 @@ async def get_cursored(
     else:
         request_delay = delay_override
 
-    request_delay = 0.2
-    print("warning: setting request_delay to 0.2")
-
     items, next_cursor = [], initial_cursor
     status_code = None
 
@@ -31,8 +26,8 @@ async def get_cursored(
         )
         if not _items:
             break
-        with start_action(action_type='sleep', request_delay=request_delay):
-            await trio.sleep(request_delay)
+        await trio.sleep(request_delay)
+
         items.extend(_items)
         if next_cursor == '0':
             break

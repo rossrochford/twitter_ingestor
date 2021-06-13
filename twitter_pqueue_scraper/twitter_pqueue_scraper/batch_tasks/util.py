@@ -53,6 +53,12 @@ MENTION_REGEX = r'@(?P<screen_name>\w+)'
 
 
 def parse_date_str(date_string):
+
+    if date_string.endswith('Z') and 'T' in date_string:
+        # v2 api format, ISO 8601
+        dt = datetime.datetime.fromisoformat(date_string[:-1])
+        return dt.replace(tzinfo=pytz.UTC)
+
     match = re.search(DATE_REGEX, date_string, flags=re.I)
 
     if match is None:

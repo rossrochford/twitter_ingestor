@@ -16,7 +16,7 @@ DEFAULT_TIMELINE_PAGES = 8
 async def _get_user_timeline(twitter_session, user_id, cursor=None, since_id=None):
 
     status, resp_obj = await twitter_session.get_user_timeline(
-        self, user_id, cursor, since_id
+        user_id, cursor, since_id
     )
     if status != 200:
         print('warning: /1.1/friends/list.json returned status: %s' % status)

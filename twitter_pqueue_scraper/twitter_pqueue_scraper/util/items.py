@@ -1,19 +1,19 @@
 
 class TwitterConversationWorkItem(object):
 
-    def __init__(self, conversation_obj_id, conversation_api_id):
-        self.conversation_obj_id = conversation_obj_id
-        self.conversation_api_id = conversation_api_id
-        self.work_type = 'conversation'
+    def __init__(self, line_id=None, conversation_id=None, work_type=None, **kwargs):
+        self.line_id = line_id
+        self.conversation_id = conversation_id
+        self.work_type = work_type
 
     @staticmethod
     def create_from_dict(msg_di):
-        if not msg_di['work_type']:
+        if not (msg_di.get('work_type') and msg_di.get('conversation_id')):
             return False, None
         # todo: add more value checks
-        return True, TwitterConversationWorkItem(
-            msg_dict['conversation_obj_id'], msg_dict['conversation_api_id']
-        )
+        if not msg_di.get('line_id'):
+            return False, None
+        return True, TwitterConversationWorkItem(**msg_di)
 
 
 class TwitterProfileWorkItem(object):

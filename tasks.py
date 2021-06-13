@@ -14,6 +14,7 @@ BASE_DIR = os.environ.get('BASE_DIR',  '/home/ross/code')
 assert os.path.exists(BASE_DIR)
 
 PROJECT_DIR = os.getcwd()
+CONFIG_DIR = f"{PROJECT_DIR}/config"
 
 POSTGRES_IMAGE = "bitnami/postgresql:13.3.0-debian-10-r22"
 POSTGRES_DATA_DIR = join_path(PROJECT_DIR, 'postgres/postgres-data')
@@ -54,7 +55,7 @@ def _copy_api_keys_file(ctx):
             BASE_DIR, 'twitter_ingestor/twitter_pqueue_scraper/.build/'
         )
         ctx.run(f'mkdir -p {destination_dir}')
-        ctx.run(f'cp ./config/api-keys.json {destination_dir}')
+        ctx.run(f'cp {CONFIG_DIR}/api-keys.json {destination_dir}')
 
 
 def _postgres_run_and_shutdown(ctx, wait_time):
@@ -105,7 +106,7 @@ def build(ctx):
         exit(f'error: BASE_DIR was not found: {BASE_DIR}')
     if not PROJECT_DIR.endswith('twitter_ingestor'):
         exit(f'current working directory must be the twitter_ingestor repo')
-    if not path_exists(f"{BASE_DIR}/config/api-keys.json"):
+    if not path_exists(f"{CONFIG_DIR}/api-keys.json"):
         exit('error: no api-keys.json file found')
 
     with ctx.cd(PROJECT_DIR):

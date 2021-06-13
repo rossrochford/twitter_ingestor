@@ -3,6 +3,7 @@ import logging
 import os
 
 import msgpack
+from msgpack import dumps as m_dumps
 import redis
 
 from twitter.models import TwitterProfile
@@ -62,7 +63,7 @@ def _create_userinfo_item(profile_or_id, priority):
 
     for key, val in item_dict.items():
         try:
-            val = msgpack.dumps(val)
+            val = m_dumps(val)
         except:
             print(f"msgpack failed {profile.id} user_info")
             return False, None
@@ -105,7 +106,7 @@ def _create_item(profile_or_id, work_type, priority):
 
     for key, val in item_dict.items():
         try:
-            val = msgpack.dumps(val)
+            val = m_dumps(val)
         except:
             print(f"msgpack failed {profile.id} {work_type}")
             return False, None
@@ -117,36 +118,35 @@ def _create_item(profile_or_id, work_type, priority):
 def _chunker(seq, size):
     return (seq[pos:pos + size] for pos in range(0, len(seq), size))
 
-'''
-def send_scrape_work_OLD(
-    redis_cli, profiles, work_type, priority=2, flush=False
+
+def send_scrape_work__conversation(
+    redis_cli, conversation_ids, priority=2, flush=False
 ):
+
     if redis_cli is None:
         redis_cli = redis.Redis(host=REDIS_HOSTNAME, port=REDIS_PORT)
 
     items = []
-    for profile_or_id in profiles:
-        if work_type == 'user_info':
-            succ, item_dict = _create_userinfo_item(profile_or_id, priority)
-        else:
-            succ, item_dict = _create_item(profile_or_id, work_type, priority)
-        if succ:
-            items.append(item_dict)
+    for id in conversation_ids:
+        items.append({
+            'conversation_id': m_dumps(id),
+            'work_type': m_dumps('conversation_tweets')
+        })
 
-    if not items:
-        return
-
+    num_items = len(items)
     if flush:
-        items.append({'flush_group': True})
+        items.append({
+            'flush_group': m_dumps(True),
+            'work_type': m_dumps('conversation_tweets')
+        })
 
-    for item_chunk in _chunker(items, 50):
-        msg = {'work_type': work_type, 'items': item_chunk}
-        redis_cli.lpush(SCRAPER_QUEUE_NAME, json.dumps(msg))
+    with redis_cli.pipeline() as pipe:
+        pipe = redis_cli.pipeline()
+        for item_dict in items:
+            pipe.xadd(REDIS_STREAM, item_dict)
+        pipe.execute()
 
-    if flush:
-        return len(items) - 1
-    return len(items)
-'''
+    return num_items
 
 
 def send_scrape_work(
@@ -171,8 +171,8 @@ def send_scrape_work(
     num_items = len(items)
     if flush:
         items.append({
-            'flush_group': msgpack.dumps(True),
-            'work_type': msgpack.dumps(work_type)
+            'flush_group': m_dumps(True),
+            'work_type': m_dumps(work_type)
         })
 
     with redis_cli.pipeline() as pipe:
@@ -185,37 +185,3 @@ def send_scrape_work(
         redis_cli.xadd(REDIS_STREAM, item_dict)'''
 
     return num_items
-
-
-'''
-def _send_for_userinfo_scrape(tag_slugs_list, flush=True):
-    profiles = Tag.get_profiles_with_tags(tag_slugs_list)
-    profiles = [o for o in profiles if o.is_due_userinfo_scrape]
-
-    userinfo_items, item_count = [], 0
-
-    for profile in profiles:
-        if not (profile.user_id or profile.screen_name):
-            continue
-        userinfo_items.append({
-            'obj_id': profile.id,
-            'user_id': profile.user_id or None,
-            'screen_name': profile.screen_name or None,
-            'work_type': 'user_info',
-            'priority': 1
-        })
-        item_count += 1
-
-    if not userinfo_items:
-        return 0
-
-    redis_cli = redis.Redis(host=REDIS_HOSTNAME, port=REDIS_PORT)
-
-    work_type = 'user_info'
-    if flush:
-        userinfo_items.append('flush-group')
-    msg = {'work_type': work_type, 'items': userinfo_items}
-    redis_cli.lpush(SCRAPER_QUEUE_NAME, json.dumps(msg))
-
-    return item_count
-'''
