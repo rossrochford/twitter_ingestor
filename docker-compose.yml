@@ -49,7 +49,7 @@ services:
 
   twitter-webserver:
     build: ./twitter_webserver
-    command: [ "sleep", "infinity" ]
+    # command: [ "sleep", "infinity" ]
     environment:
       - RUN_ENV=dev
       - REDIS_HOSTNAME=redis-server
