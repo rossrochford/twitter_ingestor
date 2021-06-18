@@ -26,7 +26,8 @@ async def scrape_user_likes(worker, global_ctx, profile_batch):
         _fetch_profiles, worker, obj_ids
     )
 
-    db_updates, user_likes_by_id = {}, {}
+    user_likes_by_id = {}
+
     for item in profile_batch:
 
         profile = profiles_by_id.get(item.obj_id)
