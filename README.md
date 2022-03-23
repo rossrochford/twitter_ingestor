@@ -54,3 +54,7 @@ Here are the webserver URLS:
     * http://localhost:8000/send-one
 * View a user's ingested tweets:
     * http://localhost:8000/feed/<screen_name_or_userid>
+
+
+### Future work
+* V2 Volume stream endpoint: https://github.com/JanaLasser/twitter_sampled_stream_v2   https://developer.twitter.com/en/docs/twitter-api/tweets/volume-streams/introduction
